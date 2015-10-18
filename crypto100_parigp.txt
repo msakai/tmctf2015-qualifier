@@ -1,0 +1,23 @@
+$ gp
+                  GP/PARI CALCULATOR Version 2.7.2 (released)
+          i386 running darwin (x86-64/GMP-6.0.0 kernel) 64-bit version
+compiled: Aug 27 2015, Apple LLVM version 6.0 (clang-600.0.56) (based on LLVM 3.5svn)
+                            threading engine: single
+                 (readline v6.3 enabled, extended help enabled)
+
+                     Copyright (C) 2000-2014 The PARI Group
+
+PARI/GP is free software, covered by the GNU General Public License, and comes 
+WITHOUT ANY WARRANTY WHATSOEVER.
+
+Type ? for help, \q to quit.
+Type ?12 for how to get moral (and possibly technical) support.
+
+parisize = 8000000, primelimit = 500000
+? factorint(82401872610398250859431855480217685317486932934710222647212042489320711027709)
+%1 = 
+[279125332373073513017147096164124452877 1]
+
+[295214597363242917440342570226980714417 1]
+
+? 

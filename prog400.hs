@@ -1,18 +1,19 @@
-
-import Data.Sequence (Seq, (|>))
+{-# LANGUAGE BangPatterns #-}
+import Data.Word
+import Data.Array.Unboxed
+import qualified Data.Foldable as F
+import Data.Monoid
+import Data.Ord (comparing)
+import Data.Sequence (Seq, (|>), (<|), (><))
 import qualified Data.Sequence as Seq
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Foldable as F
 import Debug.Trace
 
-type State = Map Char Char
+type State = UArray Char Word8
 
-swap :: Char -> Char -> Map Char Char -> Map Char Char
-swap c1 c2 s = Map.insert c1 (s Map.! c2) $ Map.insert c2 (s Map.! c1) $ s
-
+swap :: Char -> Char -> State -> State
+swap c1 c2 s = s // [(c1, s ! c2), (c2, s ! c1)]
 
 startNode :: Char
 startNode = 'P'
@@ -35,28 +36,36 @@ connections = Map.fromList tbl1 `Map.union` Map.fromListWith (++) tbl2
 -}
 
 start :: State
-start = Map.fromList [(c,c) | c <- ['A'..startNode]]
+start = array ('A', startNode) [(c, fromIntegral (fromEnum c)) | c <- ['A'..startNode]]
 
 goal :: State
 goal = swap 'A' startNode start
 
-move :: (State, Seq Char) -> [(State, Seq Char)]
-move (s, hist) = do
-  let ppos = head [pos | (pos, c) <- Map.toList s, c == startNode]
+move1 :: (State, Seq Char) -> [(State, Seq Char)]
+move1 (s, hist) = do
+  let ppos = head [pos | (pos, c) <- assocs s, c == fromIntegral (fromEnum (startNode))]
   pos2 <- connections Map.! ppos
   return ((swap ppos pos2 s), hist |> pos2)
 
-solve = loop [(start, Seq.empty)] Set.empty 0 
-  where
-    loop :: [(State, Seq Char)] -> Set State -> Int -> Seq Char
-    loop ss visited level
-      | traceShow (level, length ss, Set.size visited) False = undefined
-      | hists <- [hist | (s, hist) <- ss, s == goal], not (null hists) = minimum hists
-      | otherwise = loop (Map.toList ss') (visited `Set.union` Map.keysSet ss') (level + 1)
-          where
-            ss' = Map.fromListWith min [(s2,hist2) | (s1,hist1) <- ss, (s2,hist2) <- move (s1,hist1), s2 `Set.notMember` visited]
+move2 :: (State, Seq Char) -> [(State, Seq Char)]
+move2 (s, hist) = do
+  let ppos = head [pos | (pos, c) <- assocs s, c == fromIntegral (fromEnum (startNode))]
+  pos2 <- connections Map.! ppos
+  return ((swap ppos pos2 s), ppos <| hist)
 
+solve :: String
+solve = F.toList $ loop ([(start, Seq.empty)], Map.empty) ([(goal, Seq.empty)], Map.empty) 0 
+  where
+    loop :: ([(State, Seq Char)], Map State (Seq Char)) -> ([(State, Seq Char)], Map State (Seq Char)) -> Int -> Seq Char
+    loop (ss1, visited1) (ss2, visited2) !level
+      | traceShow (level, (length ss1, Map.size visited1), (length ss2, Map.size visited2)) False = undefined
+      | hists <- Map.intersectionWith (><) visited1 visited2, not (Map.null hists) = F.minimumBy (comparing length <> compare) $ hists
+      | otherwise = loop (Map.toList ss1', visited1 `Map.union` ss1') (Map.toList ss2', visited2 `Map.union` ss2') (level + 1)
+          where
+            ss1' = Map.fromListWith min [(s2,hist2) | (s1,hist1) <- ss1, (s2,hist2) <- move1 (s1,hist1)] `Map.difference` visited1
+            ss2' = Map.fromListWith min [(s2,hist2) | (s1,hist1) <- ss2, (s2,hist2) <- move2 (s1,hist1)] `Map.difference` visited2
+
+main :: IO ()
 main = do
   print connections
-  putStrLn $ F.toList $ solve
-
+  putStrLn $ "TMCTF{" ++ solve ++ "}" -- TMCTF{HOFMDKCJAIBKCJBKDMELCJBKDMELDMFOGNELDMFOGNFOHPGNFMDKBIA}

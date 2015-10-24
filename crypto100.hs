@@ -1,10 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
+import qualified Data.ASN1.Encoding as ASN1 -- asn1-encoding package
+import qualified Data.ASN1.BinaryEncoding as ASN1
+import qualified Data.ASN1.Types as ASN1 -- asn1-types package
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64 as Base64 -- base64-bytestring package
 import Data.List (unfoldr)
 import Data.Maybe (fromJust)
+import qualified Data.PEM as PEM -- pem package
 import Math.NumberTheory.Moduli -- arithmoi package
 import qualified Codec.Crypto.RSA as RSA -- RSA package
 
@@ -69,3 +73,33 @@ priv =
 
 plain :: BL.ByteString
 plain = RSA.decryptPKCS priv $ BL.fromStrict cipher
+
+-- (3) PEMファイルを生成してOpenSSLで復号する場合
+
+exportRSAPrivateKey :: RSA.PrivateKey -> BL.ByteString
+exportRSAPrivateKey key = PEM.pemWriteLBS pem
+  where
+    pem =
+      PEM.PEM
+      { PEM.pemName = "RSA PRIVATE KEY"
+      , PEM.pemHeader = []
+      , PEM.pemContent = asn1
+      }
+    asn1 = ASN1.encodeASN1' ASN1.DER $ [ASN1.Start ASN1.Sequence] ++ map ASN1.IntVal xs ++ [ASN1.End ASN1.Sequence]
+      where
+        pub = RSA.private_pub key
+        xs = [ 0
+             , RSA.public_n pub
+             , RSA.public_e pub
+             , RSA.private_d key
+             , RSA.private_p key
+             , RSA.private_q key
+             , RSA.private_dP key
+             , RSA.private_dQ key
+             , RSA.private_qinv key
+             ]
+{-
+ghci> BL.writeFile "crypto100.key" (exportRSAPrivateKey priv)
+ghci> :quit
+$ echo "kPmDFLk5b/torG53sThWwEeNm0AIpEQek0rVG3vCttc=" | base64 --decode | openssl rsautl -decrypt -inkey crypto100.key 
+-}
